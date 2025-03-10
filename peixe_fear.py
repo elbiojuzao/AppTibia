@@ -1,8 +1,6 @@
 import tkinter as tk
-import time
 import winsound
 import json
-import os
 
 class PeixeFear:
     def __init__(self, root):
@@ -31,7 +29,7 @@ class PeixeFear:
 
         self.root.bind("<Button-3>", self.show_menu)
 
-        self.beep_type = "long"  # Tipo inicial do bip ("long" ou "short")
+        self.beep_type = "long"  
         self.load_settings()
 
     def update_timer(self):
@@ -158,7 +156,7 @@ class PeixeFear:
 
     def load_settings(self):
         try:
-            with open("config.json", "r") as f:
+            with open("peixe_fear_config.json", "r") as f:
                 settings = json.load(f)
                 if "position" in settings:
                     self.root.geometry(settings["position"])
@@ -175,7 +173,7 @@ class PeixeFear:
             "opacity": self.root.attributes('-alpha'),
             "beep_type": self.beep_type  
         }
-        with open("config.json", "w") as f:
+        with open("peixe_fear_config.json", "w") as f: 
             json.dump(settings, f)
 
 if __name__ == "__main__":
