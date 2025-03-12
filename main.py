@@ -8,17 +8,18 @@ import os
 class MainApplication:
     def __init__(self, root):
         self.root = root
-        self.root.title("Gerenciador de Aplicativos")
+        self.root.title("Apps Tibia")
 
         self.button_frame = ttk.Frame(root, padding=10)
         self.button_frame.pack(fill=tk.BOTH, expand=True)
 
         self.buttons = {}
 
-        self.add_button("RB Boss", "rb_boss.py", 0, 0)
-        self.add_button("Peixe Fear", "peixe_fear.py", 0, 1)
-        self.add_button("Totem Putre", "putre_totem.py", 1, 0)
-        self.add_button("SSA Might", "ssa_might.py", 1, 1, image_path_before="img/Might_Ring.gif", image_path_after="img/Stone_Skin_Amulet.gif")
+        self.add_button("Boss RB", "rb_boss.py", 0, 0, image_path_before="img/Bakragore.gif")
+        self.add_button("ebb flow *Fear*", "peixe_fear.py", 0, 1, image_path_before="img/Bony_Sea_Devil.gif")
+        self.add_button("Totem Putre", "putre_totem.py", 1, 0, image_path_before="img/Radicular_Totem.gif")
+        self.add_button("SSA/Might", "ssa_might.py", 1, 1, image_path_before="img/Might_Ring.gif", image_path_after="img/Stone_Skin_Amulet.gif")
+        self.add_button("Info World", "info_world.py", 2, 1) 
 
         self.load_button_settings()
 
