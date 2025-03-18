@@ -1,6 +1,6 @@
 import tkinter as tk
 import winsound
-import json
+from utils import save_settings, load_settings
 
 class PeixeFear:
     def __init__(self, root):
@@ -153,28 +153,6 @@ class PeixeFear:
         duration = 200 if self.beep_type == "long" else 150
         winsound.Beep(frequency, duration)
         winsound.Beep(frequency, duration)
-
-    def load_settings(self):
-        try:
-            with open("peixe_fear_config.json", "r") as f:
-                settings = json.load(f)
-                if "position" in settings:
-                    self.root.geometry(settings["position"])
-                if "opacity" in settings:
-                    self.root.attributes('-alpha', settings["opacity"])
-                if "beep_type" in settings:
-                    self.beep_type = settings["beep_type"]
-        except FileNotFoundError:
-            pass
-
-    def save_settings(self):
-        settings = {
-            "position": "+{}+{}".format(self.root.winfo_x(), self.root.winfo_y()),
-            "opacity": self.root.attributes('-alpha'),
-            "beep_type": self.beep_type  
-        }
-        with open("peixe_fear_config.json", "w") as f: 
-            json.dump(settings, f)
 
 if __name__ == "__main__":
     root = tk.Tk()

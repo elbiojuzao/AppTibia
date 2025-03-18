@@ -3,6 +3,7 @@ import json
 import os
 import time
 import winsound
+from utils import save_settings, load_settings
 
 class RBBoss:
     def __init__(self, root):
@@ -117,25 +118,6 @@ class RBBoss:
     def close(self):
         self.save_settings()
         self.root.destroy()
-
-    def load_settings(self):
-        try:
-            with open("config.json", "r") as f:
-                settings = json.load(f)
-                if "position" in settings:
-                    self.root.geometry(settings["position"])
-                if "opacity" in settings:
-                    self.root.attributes('-alpha', settings["opacity"])
-        except FileNotFoundError:
-            pass
-
-    def save_settings(self):
-        settings = {
-            "position": "+{}+{}".format(self.root.winfo_x(), self.root.winfo_y()),
-            "opacity": self.root.attributes('-alpha')
-        }
-        with open("config.json", "w") as f:
-            json.dump(settings, f)
 
 if __name__ == "__main__":
     root = tk.Tk()
