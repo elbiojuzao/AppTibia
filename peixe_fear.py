@@ -1,6 +1,6 @@
 import tkinter as tk
 import winsound
-from utils import save_settings, load_settings
+from utils import save_settings, load_settings, apply_settings
 
 class PeixeFear:
     def __init__(self, root):
@@ -29,8 +29,8 @@ class PeixeFear:
 
         self.root.bind("<Button-3>", self.show_menu)
 
-        self.beep_type = "long"  
-        self.load_settings()
+        self.beep_type = "long"
+        apply_settings(self.root, "peixe_fear")
 
     def update_timer(self):
         if self.running:
@@ -142,7 +142,7 @@ class PeixeFear:
         self.root.unbind("<ButtonRelease-1>")
 
     def close(self):
-        self.save_settings()
+        save_settings(self.root, "peixe_fear")
         self.root.destroy()
 
     def set_beep_type(self, beep_type):

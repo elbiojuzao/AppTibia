@@ -1,9 +1,7 @@
 import tkinter as tk
-import json
-import os
 import time
 import winsound
-from utils import save_settings, load_settings
+from utils import save_settings, load_settings, apply_settings
 
 class RBBoss:
     def __init__(self, root):
@@ -12,10 +10,10 @@ class RBBoss:
         self.root.overrideredirect(True)
         self.root.attributes('-topmost', True)
 
-        self.initial_time = 90  
+        self.initial_time = 90
         self.time_left = self.initial_time
         self.running = False
-        self.beep_ligado = False 
+        self.beep_ligado = False
 
         self.punish_label = tk.Label(root, text="", font=("Helvetica", 24), fg="red")
         self.punish_label.pack()
@@ -23,21 +21,21 @@ class RBBoss:
         self.timer_label = tk.Label(root, text="1:30", font=("Helvetica", 24))
         self.timer_label.pack()
 
-        self.root.geometry("200x100") 
+        self.root.geometry("200x100")
 
         self.menu = tk.Menu(root, tearoff=0)
         self.menu.add_command(label="Iniciar", command=self.start_timer)
         self.menu.add_command(label="Pausar", command=self.pause_timer)
         self.menu.add_command(label="Mover", command=self.start_move)
-        self.menu.add_command(label="Beep", command=self.alternar_beep) 
+        self.menu.add_command(label="Beep", command=self.alternar_beep)
         self.menu.add_command(label="Fechar", command=self.close)
 
         self.root.bind("<Button-3>", self.show_menu)
 
-        self.first_run = True  # Variável de controle
-        self.load_settings()
+        self.first_run = True 
+        apply_settings(self.root, "rb_boss") 
 
-        self.moving = False  
+        self.moving = False
 
     def show_menu(self, event):
         self.menu.post(event.x_root, event.y_root)
@@ -50,7 +48,7 @@ class RBBoss:
     def pause_timer(self):
         self.running = False
 
-    def alternar_beep(self): 
+    def alternar_beep(self):
         self.beep_ligado = not self.beep_ligado
         if self.beep_ligado:
             self.menu.entryconfig("Beep", label="Sem Beep")
@@ -68,7 +66,7 @@ class RBBoss:
             time_string = f"{minutes}:{seconds:02d}"
             self.timer_label.config(text=time_string)
 
-            if not self.first_run:  
+            if not self.first_run:
                 if self.time_left == 84:
                     self.punish_label.config(text="PUNISH")
                 elif self.time_left == 78:
@@ -86,9 +84,9 @@ class RBBoss:
                 self.time_left -= 1
                 self.root.after(1000, self.update_timer)
             else:
-                self.time_left = self.initial_time  
-                self.punish_label.config(text="") # Limpa a label
-                self.first_run = False  # Indica que não é mais a primeira execução
+                self.time_left = self.initial_time
+                self.punish_label.config(text="") 
+                self.first_run = False 
                 self.update_timer()
                 if self.beep_ligado:
                     self.beep()
@@ -116,7 +114,7 @@ class RBBoss:
         self.root.unbind("<ButtonRelease-1>")
 
     def close(self):
-        self.save_settings()
+        save_settings(self, "rb_boss") 
         self.root.destroy()
 
 if __name__ == "__main__":

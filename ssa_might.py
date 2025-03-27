@@ -2,7 +2,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import mss
 import pygetwindow as gw
-from utils import save_settings, load_settings
+from utils import save_settings, load_settings, apply_settings
 
 class SSAMight:
     def __init__(self, root):
@@ -26,18 +26,21 @@ class SSAMight:
         self.selection_end_y = 0
         self.selection_rectangle = None
 
-        self.load_settings()
+        apply_settings(self.root, "ssa_might")
         self.update_capture()
         self.create_menu()
 
     def update_capture(self):
         with mss.mss() as sct:
-            sct_img = sct.grab(self.capture_area)
-            img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
-            self.photo = ImageTk.PhotoImage(img)
-            self.image_label.config(image=self.photo)
-            self.image_label.image = self.photo
-            self.root.after(100, self.update_capture)
+            try:
+                sct_img = sct.grab(self.capture_area)
+                img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+                self.photo = ImageTk.PhotoImage(img)
+                self.image_label.config(image=self.photo)
+                self.image_label.image = self.photo
+            except Exception as e:
+                print(f"Erro ao capturar tela: {e}")
+        self.root.after(100, self.update_capture)
 
     def create_menu(self):
         self.menu = tk.Menu(self.root, tearoff=0)
@@ -50,7 +53,7 @@ class SSAMight:
         self.menu.add_cascade(label="Opacidade", menu=self.opacity_menu)
         self.menu.add_command(label="Mover", command=self.start_move)
         self.menu.add_cascade(label="Transmitir", menu=self.create_transmit_menu())
-        self.menu.add_command(label="Window", command=self.start_selection)
+        self.menu.add_command(label="Selecionar Área", command=self.start_selection)
         self.menu.add_command(label="Fechar", command=self.close)
 
     def create_transmit_menu(self):
@@ -70,7 +73,7 @@ class SSAMight:
                 "width": window.width,
                 "height": window.height
             }
-            self.save_settings()
+            save_settings(self.root, "ssa_might")
         except IndexError:
             print(f"Janela '{window_title}' não encontrada.")
 
@@ -101,7 +104,7 @@ class SSAMight:
             self.root.unbind("<ButtonPress-1>")
             self.root.unbind("<B1-Motion>")
             self.root.unbind("<ButtonRelease-1>")
-            self.save_settings()
+            save_settings(self.root, "ssa_might")
 
     def draw_selection_rectangle(self):
         self.clear_selection_rectangle()
@@ -125,13 +128,11 @@ class SSAMight:
 
     def update_opacity(self, value):
         self.root.attributes('-alpha', value)
-        self.save_settings()
+        save_settings(self.root, "ssa_might")
 
     def close(self):
-        self.save_settings()
+        save_settings(self.root, "ssa_might")
         self.root.destroy()
-
-    
 
     def start_move(self):
         self.moving = True
