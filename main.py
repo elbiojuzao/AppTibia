@@ -5,21 +5,39 @@ import json
 import requests
 import io
 import os
-from tkinter import ttk  
 from info_world import InfoWorldWindow
 from split_loot import SplitLootWindow
-from main_help_window import MainHelpWindow  
+from main_help_window import MainHelpWindow
+from utils import load_json_config, save_json_config, requisicao_api
+import datetime
+import pytz 
 
 class MainApplication(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Apps Tibia")
-        self.geometry("380x450") # Aumentando um pouco a altura para o botão de ajuda
+        self.geometry("380x500")  # Aumentando a altura para a nova seção
         self.protocol("WM_DELETE_WINDOW", self.save_main_config_and_exit)
 
         self.config_file = "config.json"
-        self.load_main_config()
+        self.main_config = load_json_config(self.config_file, {"main_dark_mode": False, "main_x": (self.winfo_screenwidth() - 380) // 2, "main_y": (self.winfo_screenheight() - 500) // 2})
+        self.dark_mode = self.main_config.get("main_dark_mode", False)
+        self.geometry(f"+{self.main_config.get('main_x', (self.winfo_screenwidth() - 380) // 2)}+{self.main_config.get('main_y', (self.winfo_screenheight() - 500) // 2)}")
+        self.atualizar_estilo()
+
+        # --- Seção superior com imagem e mensagem ---
+        self.top_frame = ctk.CTkFrame(self)
+        self.top_frame.pack(pady=(10, 0), padx=10, fill="x")
+
+        self.rashid_image_label = ctk.CTkLabel(self.top_frame, text="")
+        self.rashid_image_label.pack(side="left", padx=(0, 10))
+        self.load_rashid_image()
+
+        self.rashid_message_label = ctk.CTkLabel(self.top_frame, text="", font=ctk.CTkFont(weight="bold"))
+        self.rashid_message_label.pack(side="left", fill="x", expand=True)
+        self.update_rashid_message()
+        self.after(60 * 60 * 1000, self.schedule_daily_update) # Agendar verificação diária
 
         # --- Widget para alternar o Dark Mode ---
         self.appearance_mode_switch = ctk.CTkSwitch(
@@ -75,51 +93,74 @@ class MainApplication(ctk.CTk):
         self.help_button = ctk.CTkButton(self, text="Ajuda", command=self.open_help_window)
         self.help_button.pack(pady=10)
 
+    def schedule_daily_update(self):
+        now = datetime.datetime.now(pytz.timezone('America/Sao_Paulo'))
+        tomorrow_5am = now.replace(hour=5, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+        time_until_update = (tomorrow_5am - now).total_seconds() * 1000
+        self.after(int(time_until_update), self.daily_update)
+
+    def daily_update(self):
+        self.update_rashid_message()
+        self.schedule_daily_update()
+
+    def update_rashid_message(self):
+        tz_sao_paulo = pytz.timezone('America/Sao_Paulo')
+        now_sao_paulo = datetime.datetime.now(tz_sao_paulo)
+        hour = now_sao_paulo.hour
+        weekday = now_sao_paulo.weekday()  # 0 = Monday, 6 = Sunday
+
+        if hour < 5:
+            # Considera o dia anterior
+            weekday = (weekday - 1) % 7
+
+        rashid_locations = [
+            "Svargrond", "Liberty Bay", "Port Hope", "Ankrahmun", "Darashia", "Edron", "Carlin"
+        ]
+        location = rashid_locations[weekday]
+        self.rashid_message_label.configure(text=f"Rashid está em: {location}")
+
+    def load_rashid_image(self):
+        script_dir = os.path.dirname(__file__)
+        image_path = os.path.join(script_dir, "img", "rashid.gif")
+        try:
+            rashid_image = Image.open(image_path)
+            if hasattr(rashid_image, 'n_frames') and rashid_image.n_frames > 1:
+                # É um GIF animado
+                self.animate_gif(self.rashid_image_label, image_path)
+            else:
+                # É uma imagem estática
+                rashid_image = rashid_image.resize((50, 50), Image.LANCZOS)
+                rashid_photo = ImageTk.PhotoImage(rashid_image)
+                self.rashid_image_label.configure(image=rashid_photo)
+                self.rashid_image_label.image = rashid_photo
+        except FileNotFoundError as e:
+            print(f"Erro ao abrir imagem '{image_path}': {e}")
+
+    def animate_gif(self, label, image_path, frame_index=0, size=(50, 50)):
+        try:
+            gif = Image.open(image_path)
+            if frame_index >= gif.n_frames:
+                frame_index = 0
+            gif.seek(frame_index)
+            frame = gif.convert("RGBA")
+            resized_frame = frame.resize(size, Image.LANCZOS)
+            photo = ImageTk.PhotoImage(resized_frame)
+            label.configure(image=photo)
+            label.image = photo
+            self.after(gif.info.get('duration', 100), self.animate_gif, label, image_path, frame_index + 1, size)
+        except FileNotFoundError as e:
+            print(f"Erro ao abrir GIF '{image_path}': {e}")
+        except Exception as e:
+            print(f"Erro ao processar GIF '{image_path}': {e}")
+
     def open_help_window(self):
         help_window = MainHelpWindow(self)
 
-    def load_main_config(self):
-        self.dark_mode = False # Valor padrão
-        default_x = (self.winfo_screenwidth() - 380) // 2
-        default_y = (self.winfo_screenheight() - 450) // 2 
-        self.geometry(f"+{default_x}+{default_y}") 
-
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, "r") as f:
-                    config = json.load(f)
-                    self.dark_mode = config.get("main_dark_mode", False)
-                    x = config.get("main_x", default_x)
-                    y = config.get("main_y", default_y)
-                    self.geometry(f"+{x}+{y}")
-                    self.atualizar_estilo()
-            except (FileNotFoundError, json.JSONDecodeError):
-                pass
-        self.atualizar_estilo()
-
     def save_main_config(self):
-        try:
-            with open(self.config_file, "r+") as f:
-                try:
-                    config = json.load(f)
-                except json.JSONDecodeError:
-                    config = {}
-                config["main_dark_mode"] = self.dark_mode
-                config["main_x"] = self.winfo_x()
-                config["main_y"] = self.winfo_y()
-                f.seek(0)
-                json.dump(config, f, indent=4)
-                f.truncate()
-        except FileNotFoundError:
-            config = {
-                "main_dark_mode": self.dark_mode,
-                "main_x": self.winfo_x(),
-                "main_y": self.winfo_y()
-            }
-            with open(self.config_file, "w") as f:
-                json.dump(config, f, indent=4)
-        except IOError as e:
-            print(f"Erro ao salvar a configuração principal: {e}")
+        self.main_config["main_dark_mode"] = self.dark_mode
+        self.main_config["main_x"] = self.winfo_x()
+        self.main_config["main_y"] = self.winfo_y()
+        save_json_config(self.config_file, self.main_config)
 
     def save_main_config_and_exit(self):
         self.save_main_config()
@@ -143,17 +184,25 @@ class MainApplication(ctk.CTk):
     def add_button(self, text, command, row, column, image_path_before=None, image_path_after=None):
         button_frame = ctk.CTkFrame(self.button_frame)
         button_frame.grid(row=row, column=column, padx=5, pady=5, sticky="ew")
+        icon_size = (20, 20)
 
         if image_path_before:
             script_dir = os.path.dirname(__file__)
             image_before_path = os.path.join(script_dir, "img", image_path_before.split('/')[-1])
             try:
                 image_before = Image.open(image_before_path)
-                image_before = image_before.resize((20, 20), Image.LANCZOS)
-                photo_image_before = ImageTk.PhotoImage(image_before)
-                label_before = ctk.CTkLabel(button_frame, image=photo_image_before, text="")
-                label_before.image = photo_image_before
-                label_before.pack(side=ctk.LEFT)
+                if hasattr(image_before, 'n_frames') and image_before.n_frames > 1:
+                    # É um GIF animado
+                    label_before = ctk.CTkLabel(button_frame, text="")
+                    label_before.pack(side=ctk.LEFT)
+                    self.animate_gif(label_before, image_before_path, size=icon_size)
+                else:
+                    # É uma imagem estática
+                    image_before = image_before.resize(icon_size, Image.LANCZOS)
+                    photo_image_before = ImageTk.PhotoImage(image_before)
+                    label_before = ctk.CTkLabel(button_frame, image=photo_image_before, text="")
+                    label_before.image = photo_image_before
+                    label_before.pack(side=ctk.LEFT)
             except FileNotFoundError as e:
                 print(f"Erro ao abrir imagem '{image_before_path}': {e}")
 
@@ -165,15 +214,69 @@ class MainApplication(ctk.CTk):
             image_after_path = os.path.join(script_dir, "img", image_path_after.split('/')[-1])
             try:
                 image_after = Image.open(image_after_path)
-                image_after = image_after.resize((20, 20), Image.LANCZOS)
-                photo_image_after = ImageTk.PhotoImage(image_after)
-                label_after = ctk.CTkLabel(button_frame, image=photo_image_after, text="")
-                label_after.image = photo_image_after
-                label_after.pack(side=ctk.LEFT)
+                if hasattr(image_after, 'n_frames') and image_after.n_frames > 1:
+                    # É um GIF animado
+                    label_after = ctk.CTkLabel(button_frame, text="")
+                    label_after.pack(side=ctk.LEFT)
+                    self.animate_gif(label_after, image_after_path, size=icon_size)
+                else:
+                    # É uma imagem estática
+                    image_after = image_after.resize(icon_size, Image.LANCZOS)
+                    photo_image_after = ImageTk.PhotoImage(image_after)
+                    label_after = ctk.CTkLabel(button_frame, image=photo_image_after, text="")
+                    label_after.image = photo_image_after
+                    label_after.pack(side=ctk.LEFT)
             except FileNotFoundError as e:
                 print(f"Erro ao abrir imagem '{image_after_path}': {e}")
 
         self.buttons[text] = button
+
+    def load_boosted_info(self):
+        self.load_boosted_boss()
+        self.load_boosted_creature()
+
+    def load_boosted_boss(self):
+        endpoint = "boostablebosses"
+        data = requisicao_api(endpoint)
+        if data and "boostable_bosses" in data and "boosted" in data["boostable_bosses"]:
+            boosted_boss = data["boostable_bosses"]["boosted"]
+            name = boosted_boss["name"]
+            image_url = boosted_boss["image_url"]
+            self.boss_name_label.configure(text=name)
+            self.load_boosted_image(image_url, self.boss_image_label)
+        else:
+            self.boss_name_label.configure(text="Erro ao carregar")
+            self.boss_image_label.configure(image="")
+
+    def load_boosted_creature(self):
+        endpoint = "creatures"
+        data = requisicao_api(endpoint)
+        if data and "creatures" in data and "boosted" in data["creatures"]:
+            boosted_creature = data["creatures"]["boosted"]
+            name = boosted_creature["name"]
+            image_url = boosted_creature["image_url"]
+            self.creature_name_label.configure(text=name)
+            self.load_boosted_image(image_url, self.creature_image_label)
+        else:
+            self.creature_name_label.configure(text="Erro ao carregar")
+            self.creature_image_label.configure(image="")
+
+    def load_boosted_image(self, image_url, label):
+        try:
+            response = requests.get(image_url)
+            response.raise_for_status()
+            image_data = response.content
+            image = Image.open(io.BytesIO(image_data))
+            resized_image = image.resize((80, 80), Image.LANCZOS)
+            photo = ImageTk.PhotoImage(resized_image)
+            label.configure(image=photo)
+            label.image = photo
+        except requests.exceptions.RequestException as e:
+            print(f"Erro ao carregar imagem: {e}")
+            label.configure(image="")
+        except Exception as e:
+            print(f"Erro ao processar imagem: {e}")
+            label.configure(image="")
 
     def run_app(self, command):
         if command == "info_world.py":
@@ -204,69 +307,6 @@ class MainApplication(ctk.CTk):
                             button.grid(row=position["row"], column=position["column"], padx=5, pady=5, sticky="ew")
         except FileNotFoundError:
             pass
-
-    def load_boosted_info(self):
-        self.load_boosted_boss()
-        self.load_boosted_creature()
-
-    def load_boosted_boss(self):
-        url = "https://api.tibiadata.com/v4/boostablebosses"
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            if data and "boostable_bosses" in data and "boosted" in data["boostable_bosses"]:
-                boosted_boss = data["boostable_bosses"]["boosted"]
-                name = boosted_boss["name"]
-                image_url = boosted_boss["image_url"]
-                print(f"Tentando baixar imagem do Boss: {image_url}")
-                self.boss_name_label.configure(text=name)
-                self.load_image(image_url, self.boss_image_label)
-            else:
-                self.boss_name_label.configure(text="Erro ao carregar")
-                self.boss_image_label.configure(image="")
-        except requests.exceptions.RequestException as e:
-            print(f"Erro ao buscar boosted boss: {e}")
-            self.boss_name_label.configure(text="Erro ao carregar")
-            self.boss_image_label.configure(image="")
-
-    def load_boosted_creature(self):
-        url = "https://api.tibiadata.com/v4/creatures"
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            if data and "creatures" in data and "boosted" in data["creatures"]:
-                boosted_creature = data["creatures"]["boosted"]
-                name = boosted_creature["name"]
-                image_url = boosted_creature["image_url"]
-                print(f"Tentando baixar imagem da Criatura: {image_url}")
-                self.creature_name_label.configure(text=name)
-                self.load_image(image_url, self.creature_image_label)
-            else:
-                self.creature_name_label.configure(text="Erro ao carregar")
-                self.creature_image_label.configure(image="")
-        except requests.exceptions.RequestException as e:
-            print(f"Erro ao buscar boosted creature: {e}")
-            self.creature_name_label.configure(text="Erro ao carregar")
-            self.creature_image_label.configure(image="")
-
-    def load_image(self, image_url, label):
-        try:
-            response = requests.get(image_url)
-            response.raise_for_status()
-            image_data = response.content
-            image = Image.open(io.BytesIO(image_data))
-            image = image.resize((80, 80), Image.LANCZOS)
-            photo = ImageTk.PhotoImage(image)
-            label.configure(image=photo)
-            label.image = photo
-        except requests.exceptions.RequestException as e:
-            print(f"Erro ao carregar imagem: {e}")
-            label.configure(image="")
-        except Exception as e:
-            print(f"Erro ao processar imagem: {e}")
-            label.configure(image="")
 
 if __name__ == "__main__":
     app = MainApplication()
