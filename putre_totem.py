@@ -11,17 +11,19 @@ class PutreTotem:
         self.root.overrideredirect(True)
         self.root.wm_attributes("-transparentcolor", "white")
 
+        self.config_file = "config.json"
+
         self.total_time = 5
         self.counter = 0
         self.direction = 0
         self.is_active = False
+        self.show_help_on_startup = True  # Inicialmente mostrar a ajuda
 
         self.font = ctk.CTkFont(size=48)
-        self.label_width = 100 
-        self.label_height = 50  
+        self.label_width = 100
+        self.label_height = 50
         self.text_label = ctk.CTkLabel(self.root, text="N↑6", font=self.font, text_color="lime",
-                                       bg_color='white', 
-                                       fg_color='transparent', 
+                                       bg_color='white', fg_color='transparent',
                                        width=self.label_width, height=self.label_height)
         self.text_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
@@ -31,9 +33,9 @@ class PutreTotem:
         self.load_config()
 
         self.root.bind("<+>", self.start_direction_cycle)
-        self.root.bind("<Control-Shift-Alt-Return>", self.exit_app) 
-        self.root.bind("<Alt-plus>", self.increase_opacity)    
-        self.root.bind("<Alt-minus>", self.decrease_opacity) 
+        self.root.bind("<Control-Shift-Alt-Return>", self.exit_app)
+        self.root.bind("<Alt-plus>", self.increase_opacity)
+        self.root.bind("<Alt-minus>", self.decrease_opacity)
 
         # --- Funcionalidade de arrastar ---
         self.root.bind("<Button-1>", self.start_drag)
@@ -42,6 +44,12 @@ class PutreTotem:
         self.y_offset = 0
 
         self.root.protocol("WM_DELETE_WINDOW", self.save_config_and_exit)
+
+        if self.show_help_on_startup:
+            self.show_help()
+
+    def show_help(self):
+        help_window = HelpWindow(self)
 
     def start_drag(self, event):
         self.x_offset = event.x
@@ -112,31 +120,34 @@ class PutreTotem:
         self.opacity = new_opacity
 
     def load_config(self):
-        config_file = "putre_totem_config.json"
-        if os.path.exists(config_file):
+        if os.path.exists(self.config_file):
             try:
-                with open(config_file, "r") as f:
+                with open(self.config_file, "r") as f:
                     config = json.load(f)
                     x = config.get("x", self.default_x)
                     y = config.get("y", self.default_y)
                     self.opacity = config.get("opacity", self.default_opacity)
+                    self.show_help_on_startup = config.get("show_help", True)
                     self.root.geometry(f"+{x}+{y}")
                     self.root.attributes('-alpha', self.opacity)
             except (FileNotFoundError, json.JSONDecodeError):
-                self.root.geometry(f"+{self.default_x}+{self.default_y}")
-                self.root.attributes('-alpha', self.default_opacity)
+                self.load_default_config()
         else:
-            self.root.geometry(f"+{self.default_x}+{self.default_y}")
-            self.root.attributes('-alpha', self.default_opacity)
-            self.opacity = self.default_opacity
+            self.load_default_config()
+
+
+    def load_default_config(self):
+        self.root.geometry(f"+{self.default_x}+{self.default_y}")
+        self.root.attributes('-alpha', self.default_opacity)
+        self.opacity = self.default_opacity
+        self.show_help_on_startup = True
 
     def save_config(self):
-        config_file = "putre_totem_config.json"
         x = self.root.winfo_x()
         y = self.root.winfo_y()
-        config = {"x": x, "y": y, "opacity": self.opacity}
+        config = {"x": x, "y": y, "opacity": self.opacity, "show_help": self.show_help_on_startup}
         try:
-            with open(config_file, "w") as f:
+            with open(self.config_file, "w") as f:
                 json.dump(config, f)
         except IOError as e:
             print(f"Erro ao salvar a configuração: {e}")
@@ -145,10 +156,36 @@ class PutreTotem:
         self.save_config()
         self.exit_app()
 
+class HelpWindow(ctk.CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent.root)
+        self.title("Putre Totem - Ajuda")
+        self.geometry("300x200+300+300")
+        self.parent = parent
+        self.protocol("WM_DELETE_WINDOW", self.close_window)
+
+        ctk.CTkLabel(self, text="Hotkeys:", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+        ctk.CTkLabel(self, text="Iniciar/Parar Ciclo: +").pack()
+        ctk.CTkLabel(self, text="Fechar App: Ctrl+Shift+Alt+Enter").pack()
+        ctk.CTkLabel(self, text="Aumentar Opacidade: Alt + (+)").pack()
+        ctk.CTkLabel(self, text="Diminuir Opacidade: Alt + (-)").pack()
+
+        self.show_on_startup_var = tk.BooleanVar(value=self.parent.show_help_on_startup)
+        checkbox = ctk.CTkCheckBox(self, text="Não mostrar esta tela novamente", variable=self.show_on_startup_var)
+        checkbox.pack(pady=10)
+
+        close_button = ctk.CTkButton(self, text="Fechar", command=self.close_window)
+        close_button.pack(pady=5)
+
+    def close_window(self):
+        self.parent.show_help_on_startup = not self.show_on_startup_var.get() # Inverte o valor para salvar "não mostrar"
+        self.parent.save_config()
+        self.destroy()
+
 if __name__ == "__main__":
     root = tk.Tk()
-    root.withdraw() 
-    toplevel = tk.Toplevel(root) 
+    root.withdraw()
+    toplevel = tk.Toplevel(root)
     app = PutreTotem(toplevel)
     toplevel.attributes('-topmost', True)
     toplevel.overrideredirect(True)
