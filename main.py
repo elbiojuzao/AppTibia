@@ -125,7 +125,9 @@ class MainApplication(ctk.CTk):
             split_loot_window = ctk.CTkToplevel(self)
             app = SplitLootWindow(split_loot_window)
         else:
-            subprocess.Popen(["python", command])
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            putre_totem_path = os.path.join(script_dir, "putre_totem.py")
+            subprocess.Popen(["python", putre_totem_path])
 
     def load_button_settings(self):
         try:

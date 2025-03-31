@@ -1,174 +1,156 @@
 import tkinter as tk
-import time
+import customtkinter as ctk
 import json
 import os
-from tkinter import colorchooser
-from utils import save_settings, load_settings, apply_settings
 
-class DirectionApp:
+class PutreTotem:
     def __init__(self, root):
         self.root = root
-        self.root.title("Totem Putre")
+        self.root.title("Direction Indicator")
         self.root.attributes('-topmost', True)
         self.root.overrideredirect(True)
-        self.root.resizable(False, False)
+        self.root.wm_attributes("-transparentcolor", "white")
 
-        apply_settings(self.root, "putre_totem")
+        self.total_time = 5
+        self.counter = 0
+        self.direction = 0
+        self.is_active = False
 
-        self.root.attributes('-alpha', 0.75)
+        self.font = ctk.CTkFont(size=48)
+        self.label_width = 100 
+        self.label_height = 50  
+        self.text_label = ctk.CTkLabel(self.root, text="N↑6", font=self.font, text_color="lime",
+                                       bg_color='white', 
+                                       fg_color='transparent', 
+                                       width=self.label_width, height=self.label_height)
+        self.text_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        self.original_counter_font_size = 60
-        self.original_direction_font_size = 80
+        self.default_x = 100
+        self.default_y = 100
+        self.default_opacity = 0.8
+        self.load_config()
 
-        self.counter_label = tk.Label(root, text="", font=("Helvetica", self.original_counter_font_size), anchor=tk.CENTER)
-        self.counter_label.grid(row=0, column=0, sticky="nsew")
+        self.root.bind("<+>", self.start_direction_cycle)
+        self.root.bind("<Control-Shift-Alt-Return>", self.exit_app) 
+        self.root.bind("<Alt-plus>", self.increase_opacity)    
+        self.root.bind("<Alt-minus>", self.decrease_opacity) 
 
-        self.direction_label = tk.Label(root, text="", font=("Helvetica", self.original_direction_font_size), anchor=tk.CENTER)
-        self.direction_label.grid(row=0, column=1, padx=2, sticky="nsew")
+        # --- Funcionalidade de arrastar ---
+        self.root.bind("<Button-1>", self.start_drag)
+        self.root.bind("<B1-Motion>", self.on_drag)
+        self.x_offset = 0
+        self.y_offset = 0
 
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_columnconfigure(1, weight=1)
+        self.root.protocol("WM_DELETE_WINDOW", self.save_config_and_exit)
 
-        self.running = False
-        self.counter = 5
-        self.directions = ["↥", "↦", "↧", "↤"]
-        self.current_direction = 0
-        self.font_color = "black" # Cor padrão da fonte
+    def start_drag(self, event):
+        self.x_offset = event.x
+        self.y_offset = event.y
 
-        self.menu = tk.Menu(root, tearoff=0)
-        self.actions_menu = tk.Menu(self.menu, tearoff=0)
-        self.opacity_menu = tk.Menu(self.menu, tearoff=0)
-        self.size_menu = tk.Menu(self.menu, tearoff=0) # Novo menu para tamanhos
+    def on_drag(self, event):
+        x = self.root.winfo_pointerx() - self.x_offset
+        y = self.root.winfo_pointery() - self.y_offset
+        self.root.geometry(f"+{x}+{y}")
 
-        self.actions_menu.add_command(label="Iniciar", command=self.start)
-        self.actions_menu.add_command(label="Pausar", command=self.pause)
-        self.actions_menu.add_command(label="Reiniciar", command=self.restart)
-        self.actions_menu.add_command(label="Mudar Cor da Fonte", command=self.change_font_color)
+    def start_direction_cycle(self, event=None):
+        if not self.is_active:
+            self.is_active = True
+            self.counter = 0
+            self.direction = 0
+            self.update_osd_text()
+            self.root.after(1000, self.update_timer)
+            self.root.after(1000, self.update_timer_seconds)
 
-        self.opacity_menu.add_command(label="1.0", command=lambda: self.update_opacity(1.0))
-        self.opacity_menu.add_command(label="0.75", command=lambda: self.update_opacity(0.75))
-        self.opacity_menu.add_command(label="0.5", command=lambda: self.update_opacity(0.5))
-        self.opacity_menu.add_command(label="0.25", command=lambda: self.update_opacity(0.25))
-        self.opacity_menu.add_command(label="0.10", command=lambda: self.update_opacity(0.10))
-
-        self.size_menu.add_command(label="Pequeno", command=lambda: self.set_size(150, 100))
-        self.size_menu.add_command(label="Médio", command=lambda: self.set_size(200, 150))
-        self.size_menu.add_command(label="Grande", command=lambda: self.set_size(250, 200))
-
-        self.menu.add_cascade(label="Ações", menu=self.actions_menu)
-        self.menu.add_cascade(label="Opacidade", menu=self.opacity_menu)
-        self.menu.add_cascade(label="Tamanho", menu=self.size_menu) # Adiciona o menu de tamanhos
-        self.menu.add_command(label="Mover", command=self.start_move)
-        self.menu.add_command(label="Fechar", command=self.close)
-
-        self.root.bind("<Button-3>", self.show_menu)
-        self.root.protocol("WM_DELETE_WINDOW", self.close)
-
-        self.moving = False
-        self.resizing = False
-        self.x, self.y = 0, 0
-        self.original_width = self.root.winfo_width()
-        self.original_height = self.root.winfo_height()
-
-        self.load_font_color() # Carregar a cor da fonte ao iniciar
-
-    def show_menu(self, event):
-        self.menu.post(event.x_root, event.y_root)
-
-    def start(self):
-        if not self.running:
-            self.running = True
-            self.root.wm_attributes('-transparentcolor', 'white')
-            self.update_direction()
-
-    def pause(self):
-        self.running = False
-
-    def restart(self):
-        self.running = False
-        self.counter = 5
-        self.direction_label.config(text="", fg=self.font_color)
-        self.counter_label.config(text="", fg=self.font_color)
-        self.current_direction = 0
-
-    def update_direction(self):
-        if self.running:
-            direction = self.directions[self.current_direction]
-            font_size = self.original_direction_font_size
-            self.direction_label.config(text=direction, font=("Helvetica", font_size), fg=self.font_color)
-            self.counter = 5
-            self.update_counter()
-
-    def update_counter(self):
-        if self.running:
-            self.counter_label.config(text=str(self.counter), fg=self.font_color)
-            if self.counter > 0:
-                self.counter -= 1
-                self.root.after(1000, self.update_counter)
+    def update_timer(self):
+        if self.is_active:
+            if self.total_time - self.counter > 0:
+                self.update_osd_text()
+                self.root.after(1000, self.update_timer) 
+                self.counter += 1
             else:
-                self.current_direction = (self.current_direction + 1) % 4
-                self.update_direction()
+                self.direction = (self.direction + 1) % 4
+                self.counter = 0
+                self.update_osd_text()
+                self.root.after(1000, self.update_timer) 
 
-    def update_opacity(self, value):
-        self.root.attributes('-alpha', value)
+    def update_timer_seconds(self):
+        if self.is_active:
+            self.update_osd_text()
+            self.root.after(1000, self.update_timer_seconds)
 
-    def start_move(self):
-        self.moving = True
-        self.root.bind("<B1-Motion>", self.move)
-        self.root.bind("<ButtonRelease-1>", self.stop_move)
+    def update_osd_text(self):
+        time_display = self.total_time - self.counter
+        sec = max(0, time_display)
 
-    def move(self, event):
-        if self.moving:
-            self.root.geometry(f"+{event.x_root}+{event.y_root}")
+        if self.direction == 0:
+            direction_char = "N↑"
+        elif self.direction == 1:
+            direction_char = "D→"
+        elif self.direction == 2:
+            direction_char = "S↓"
+        elif self.direction == 3:
+            direction_char = "E←"
+        else:
+            direction_char = "?"
 
-    def stop_move(self, event):
-        self.moving = False
-        self.root.unbind("<B1-Motion>")
-        self.root.unbind("<ButtonRelease-1>")
+        self.text_label.configure(text=f"{direction_char}{sec}")
 
-    def set_size(self, width, height):
-        self.root.geometry(f"{width}x{height}")
-        self.original_width = width
-        self.original_height = height
-        self.resize_fonts(width / 200, height / 150) # Ajusta as fontes proporcionalmente
-        save_settings(self.root, "putre_totem") # Salva o novo tamanho
-
-    def resize_fonts(self, width_ratio, height_ratio):
-        ratio = max(width_ratio, height_ratio)
-        new_counter_font_size = int(self.original_counter_font_size * ratio)
-        new_direction_font_size = int(self.original_direction_font_size * ratio)
-        self.counter_label.config(font=("Helvetica", new_counter_font_size))
-        self.direction_label.config(font=("Helvetica", new_direction_font_size))
-
-    def change_font_color(self):
-        color_code = colorchooser.askcolor(title="Escolha a cor da fonte")[1]
-        if color_code:
-            self.font_color = color_code
-            self.counter_label.config(fg=self.font_color)
-            self.direction_label.config(fg=self.font_color)
-            self.save_font_color() # Salvar a cor da fonte
-
-    def save_font_color(self):
-        configuracoes = load_settings() or {}
-        if "putre_totem" not in configuracoes:
-            configuracoes["putre_totem"] = {}
-        configuracoes["putre_totem"]["font_color"] = self.font_color
-        with open("config.json", "w") as arquivo:
-            json.dump(configuracoes, arquivo, indent=4)
-
-    def load_font_color(self):
-        settings = load_settings()
-        if "putre_totem" in settings and "font_color" in settings["putre_totem"]:
-            self.font_color = settings["putre_totem"]["font_color"]
-            self.counter_label.config(fg=self.font_color)
-            self.direction_label.config(fg=self.font_color)
-
-    def close(self):
-        save_settings(self.root, "putre_totem")
+    def exit_app(self, event=None):
+        self.is_active = False
         self.root.destroy()
+
+    def increase_opacity(self, event):
+        current_opacity = self.root.attributes('-alpha')
+        new_opacity = min(1.0, current_opacity + 0.05)
+        self.root.attributes('-alpha', new_opacity)
+        self.opacity = new_opacity
+
+    def decrease_opacity(self, event):
+        current_opacity = self.root.attributes('-alpha')
+        new_opacity = max(0.1, current_opacity - 0.05)
+        self.root.attributes('-alpha', new_opacity)
+        self.opacity = new_opacity
+
+    def load_config(self):
+        config_file = "putre_totem_config.json"
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, "r") as f:
+                    config = json.load(f)
+                    x = config.get("x", self.default_x)
+                    y = config.get("y", self.default_y)
+                    self.opacity = config.get("opacity", self.default_opacity)
+                    self.root.geometry(f"+{x}+{y}")
+                    self.root.attributes('-alpha', self.opacity)
+            except (FileNotFoundError, json.JSONDecodeError):
+                self.root.geometry(f"+{self.default_x}+{self.default_y}")
+                self.root.attributes('-alpha', self.default_opacity)
+        else:
+            self.root.geometry(f"+{self.default_x}+{self.default_y}")
+            self.root.attributes('-alpha', self.default_opacity)
+            self.opacity = self.default_opacity
+
+    def save_config(self):
+        config_file = "putre_totem_config.json"
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        config = {"x": x, "y": y, "opacity": self.opacity}
+        try:
+            with open(config_file, "w") as f:
+                json.dump(config, f)
+        except IOError as e:
+            print(f"Erro ao salvar a configuração: {e}")
+
+    def save_config_and_exit(self):
+        self.save_config()
+        self.exit_app()
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = DirectionApp(root)
+    root.withdraw() 
+    toplevel = tk.Toplevel(root) 
+    app = PutreTotem(toplevel)
+    toplevel.attributes('-topmost', True)
+    toplevel.overrideredirect(True)
+    toplevel.wm_attributes("-transparentcolor", "white")
     root.mainloop()
