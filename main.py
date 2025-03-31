@@ -5,27 +5,30 @@ import json
 import requests
 import io
 import os
+from tkinter import ttk  
 from info_world import InfoWorldWindow
 from split_loot import SplitLootWindow
+from main_help_window import MainHelpWindow  
 
 class MainApplication(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Apps Tibia")
-        self.geometry("380x400")
+        self.geometry("380x450") # Aumentando um pouco a altura para o botão de ajuda
+        self.protocol("WM_DELETE_WINDOW", self.save_main_config_and_exit)
 
-        # Inicialização do modo escuro
-        self.dark_mode = False
-        self.atualizar_estilo()
+        self.config_file = "config.json"
+        self.load_main_config()
 
         # --- Widget para alternar o Dark Mode ---
         self.appearance_mode_switch = ctk.CTkSwitch(
             master=self,
-            text="Dark Mode",
+            text="Dark Mode" if self.dark_mode else "Light Mode",
             command=self.toggle_dark_mode
         )
         self.appearance_mode_switch.pack(pady=10, padx=10, anchor="ne")
+        self.appearance_mode_switch.select() if self.dark_mode else self.appearance_mode_switch.deselect()
 
         self.button_frame = ctk.CTkFrame(self)
         self.button_frame.pack(fill=ctk.BOTH, expand=True, padx=10, pady=10)
@@ -68,6 +71,60 @@ class MainApplication(ctk.CTk):
         self.load_boosted_info()
         self.load_button_settings()
 
+        # Botão de Ajuda
+        self.help_button = ctk.CTkButton(self, text="Ajuda", command=self.open_help_window)
+        self.help_button.pack(pady=10)
+
+    def open_help_window(self):
+        help_window = MainHelpWindow(self)
+
+    def load_main_config(self):
+        self.dark_mode = False # Valor padrão
+        default_x = (self.winfo_screenwidth() - 380) // 2
+        default_y = (self.winfo_screenheight() - 450) // 2 
+        self.geometry(f"+{default_x}+{default_y}") 
+
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, "r") as f:
+                    config = json.load(f)
+                    self.dark_mode = config.get("main_dark_mode", False)
+                    x = config.get("main_x", default_x)
+                    y = config.get("main_y", default_y)
+                    self.geometry(f"+{x}+{y}")
+                    self.atualizar_estilo()
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+        self.atualizar_estilo()
+
+    def save_main_config(self):
+        try:
+            with open(self.config_file, "r+") as f:
+                try:
+                    config = json.load(f)
+                except json.JSONDecodeError:
+                    config = {}
+                config["main_dark_mode"] = self.dark_mode
+                config["main_x"] = self.winfo_x()
+                config["main_y"] = self.winfo_y()
+                f.seek(0)
+                json.dump(config, f, indent=4)
+                f.truncate()
+        except FileNotFoundError:
+            config = {
+                "main_dark_mode": self.dark_mode,
+                "main_x": self.winfo_x(),
+                "main_y": self.winfo_y()
+            }
+            with open(self.config_file, "w") as f:
+                json.dump(config, f, indent=4)
+        except IOError as e:
+            print(f"Erro ao salvar a configuração principal: {e}")
+
+    def save_main_config_and_exit(self):
+        self.save_main_config()
+        self.destroy()
+
     def toggle_dark_mode(self):
         self.dark_mode = not self.dark_mode
         self.atualizar_estilo()
@@ -75,6 +132,7 @@ class MainApplication(ctk.CTk):
             self.appearance_mode_switch.configure(text="Dark Mode")
         else:
             self.appearance_mode_switch.configure(text="Light Mode")
+        self.save_main_config() # Salvar o estado do Dark Mode
 
     def atualizar_estilo(self):
         if self.dark_mode:
@@ -124,10 +182,14 @@ class MainApplication(ctk.CTk):
         elif command == "split_loot.py":
             split_loot_window = ctk.CTkToplevel(self)
             app = SplitLootWindow(split_loot_window)
-        else:
+        elif command == "putre_totem.py":
             script_dir = os.path.dirname(os.path.abspath(__file__))
             putre_totem_path = os.path.join(script_dir, "putre_totem.py")
             subprocess.Popen(["python", putre_totem_path])
+        else:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            app_path = os.path.join(script_dir, command)
+            subprocess.Popen(["python", app_path])
 
     def load_button_settings(self):
         try:
