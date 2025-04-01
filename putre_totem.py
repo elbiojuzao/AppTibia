@@ -1,7 +1,10 @@
 import tkinter as tk
 import customtkinter as ctk
-import json
 import os
+from utils import save_json_config, load_json_config, increase_opacity, decrease_opacity
+
+CONFIG_KEY_PUTRE_TOTEM = "putre_totem_settings"
+CONFIG_FILE = "config.json"
 
 class PutreTotem:
     def __init__(self, root):
@@ -10,9 +13,9 @@ class PutreTotem:
         self.root.attributes('-topmost', True)
         self.root.overrideredirect(True)
         self.root.wm_attributes("-transparentcolor", "white")
+        self.root.configure(bg="white")
 
-        self.config_file = "config.json"
-
+        self.app_name = "putre_totem"
         self.total_time = 5
         self.counter = 0
         self.direction = 0
@@ -22,19 +25,16 @@ class PutreTotem:
         self.label_width = 100
         self.label_height = 50
         self.text_label = ctk.CTkLabel(self.root, text="N↑6", font=self.font, text_color="lime",
-                                       bg_color='white', fg_color='transparent',
-                                       width=self.label_width, height=self.label_height)
+                                            bg_color='white', fg_color='transparent',
+                                            width=self.label_width, height=self.label_height)
         self.text_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        self.default_x = 100
-        self.default_y = 100
-        self.default_opacity = 0.8
         self.load_config()
 
         self.root.bind("<+>", self.start_direction_cycle)
         self.root.bind("<Control-Shift-Alt-Return>", self.exit_app)
-        self.root.bind("<Alt-plus>", self.increase_opacity)
-        self.root.bind("<Alt-minus>", self.decrease_opacity)
+        self.root.bind("<Alt-plus>", self.increase_opacity_event)
+        self.root.bind("<Alt-minus>", self.decrease_opacity_event)
 
         # --- Funcionalidade de arrastar ---
         self.root.bind("<Button-1>", self.start_drag)
@@ -60,7 +60,6 @@ class PutreTotem:
             self.direction = 0
             self.update_osd_text()
             self.root.after(1000, self.update_timer)
-            self.root.after(1000, self.update_timer_seconds)
 
     def update_timer(self):
         if self.is_active:
@@ -73,11 +72,6 @@ class PutreTotem:
                 self.counter = 0
                 self.update_osd_text()
                 self.root.after(1000, self.update_timer)
-
-    def update_timer_seconds(self):
-        if self.is_active:
-            self.update_osd_text()
-            self.root.after(1000, self.update_timer_seconds)
 
     def update_osd_text(self):
         time_display = self.total_time - self.counter
@@ -100,61 +94,24 @@ class PutreTotem:
         self.is_active = False
         self.root.destroy()
 
-    def increase_opacity(self, event):
-        current_opacity = self.root.attributes('-alpha')
-        new_opacity = min(1.0, current_opacity + 0.05)
-        self.root.attributes('-alpha', new_opacity)
-        self.opacity = new_opacity
+    def increase_opacity_event(self, event):
+        increase_opacity(self.root)
 
-    def decrease_opacity(self, event):
-        current_opacity = self.root.attributes('-alpha')
-        new_opacity = max(0.1, current_opacity - 0.05)
-        self.root.attributes('-alpha', new_opacity)
-        self.opacity = new_opacity
+    def decrease_opacity_event(self, event):
+        decrease_opacity(self.root)
 
     def load_config(self):
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, "r") as f:
-                    config = json.load(f)
-                    x = config.get("putre_totem_x", self.default_x)
-                    y = config.get("putre_totem_y", self.default_y)
-                    self.opacity = config.get("putre_totem_opacity", self.default_opacity)
-                    self.root.geometry(f"+{x}+{y}")
-                    self.root.attributes('-alpha', self.opacity)
-            except (FileNotFoundError, json.JSONDecodeError):
-                self.load_default_config()
-        else:
-            self.load_default_config()
-
-    def load_default_config(self):
-        self.root.geometry(f"+{self.default_x}+{self.default_y}")
-        self.root.attributes('-alpha', self.default_opacity)
-        self.opacity = self.default_opacity
+        config = load_json_config(CONFIG_FILE, {})
+        putre_totem_settings = config.get(CONFIG_KEY_PUTRE_TOTEM, {"geometry": f"100x50+{self.root.winfo_screenwidth()//2 - 50}+{self.root.winfo_screenheight()//2 - 25}", "alpha": 0.8})
+        self.root.geometry(putre_totem_settings.get("geometry"))
+        self.root.attributes('-alpha', putre_totem_settings.get("alpha"))
+        self.opacity = self.root.attributes('-alpha')
 
     def save_config(self):
-        try:
-            with open(self.config_file, "r+") as f:
-                try:
-                    config = json.load(f)
-                except json.JSONDecodeError:
-                    config = {}
-                config["putre_totem_x"] = self.root.winfo_x()
-                config["putre_totem_y"] = self.root.winfo_y()
-                config["putre_totem_opacity"] = self.opacity
-                f.seek(0)
-                json.dump(config, f, indent=4)
-                f.truncate()
-        except FileNotFoundError:
-            config = {
-                "putre_totem_x": self.root.winfo_x(),
-                "putre_totem_y": self.root.winfo_y(),
-                "putre_totem_opacity": self.opacity
-            }
-            with open(self.config_file, "w") as f:
-                json.dump(config, f, indent=4)
-        except IOError as e:
-            print(f"Erro ao salvar a configuração: {e}")
+        config = load_json_config(CONFIG_FILE, {})
+        settings = {"geometry": self.root.geometry(), "alpha": self.root.attributes('-alpha')}
+        config[CONFIG_KEY_PUTRE_TOTEM] = settings
+        save_json_config(CONFIG_FILE, config)
 
     def save_config_and_exit(self):
         self.save_config()
@@ -163,9 +120,6 @@ class PutreTotem:
 if __name__ == "__main__":
     root = tk.Tk()
     root.withdraw()
-    toplevel = tk.Toplevel(root)
+    toplevel = ctk.CTkToplevel(root)
     app = PutreTotem(toplevel)
-    toplevel.attributes('-topmost', True)
-    toplevel.overrideredirect(True)
-    toplevel.wm_attributes("-transparentcolor", "white")
     root.mainloop()
