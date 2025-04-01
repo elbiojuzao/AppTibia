@@ -21,5 +21,8 @@
         "y": 291,
         "largura": 200,
         "altura": 100
-    }
+    },
+    "main_dark_mode": false,
+    "main_x": 770,
+    "main_y": 290
 }

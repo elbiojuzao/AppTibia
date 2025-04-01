@@ -6,6 +6,7 @@ import requests
 import io
 import os
 from info_world import InfoWorldWindow
+from rb_boss import RbBossWindow
 from split_loot import SplitLootWindow
 from peixe_fear import PeixeFear
 from main_help_window import MainHelpWindow
@@ -280,7 +281,12 @@ class MainApplication(ctk.CTk):
             label.configure(image="")
 
     def run_app(self, command):
-        if command == "info_world.py":
+        venv_python = os.path.join(os.getcwd(), ".venv", "Scripts", "python.exe")
+
+        if command == "rb_boss.py":
+            rb_boss_window = ctk.CTkToplevel(self)
+            app = RbBossWindow(rb_boss_window)
+        elif command == "info_world.py":
             info_world_window = ctk.CTkToplevel(self)
             app = InfoWorldWindow(info_world_window)
         elif command == "split_loot.py":
@@ -289,14 +295,14 @@ class MainApplication(ctk.CTk):
         elif command == "putre_totem.py":
             script_dir = os.path.dirname(os.path.abspath(__file__))
             putre_totem_path = os.path.join(script_dir, "putre_totem.py")
-            subprocess.Popen(["python", putre_totem_path])
+            subprocess.Popen([venv_python, putre_totem_path])
         elif command == "peixe_fear.py":
             peixe_fear_window = ctk.CTkToplevel(self)
             app = PeixeFear(peixe_fear_window)
         else:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             app_path = os.path.join(script_dir, command)
-            subprocess.Popen(["python", app_path])
+            subprocess.Popen([venv_python, app_path])
 
     def load_button_settings(self):
         try:
