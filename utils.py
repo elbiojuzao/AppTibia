@@ -90,12 +90,3 @@ def load_image_from_url(image_url, size=(80, 80)):
         print(f"Erro ao processar imagem de {image_url}: {e}")
         return None
     
-def increase_opacity(self, event):
-    current_opacity = self.root.attributes('-alpha')
-    new_opacity = min(1.0, current_opacity + 0.05)
-    self.root.attributes('-alpha', new_opacity)
-    
-def decrease_opacity(self, event):
-    current_opacity = self.root.attributes('-alpha')
-    new_opacity = max(0.1, current_opacity - 0.05)
-    self.root.attributes('-alpha', new_opacity)

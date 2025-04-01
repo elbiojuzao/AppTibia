@@ -1,7 +1,7 @@
 import tkinter as tk
 import customtkinter as ctk
 import winsound
-from utils import save_json_config, load_json_config, increase_opacity, decrease_opacity
+from utils import save_json_config, load_json_config
 
 CONFIG_KEY_PEIXE_FEAR = "peixe_fear_settings"
 CONFIG_FILE = "config.json"
@@ -94,13 +94,16 @@ class PeixeFear:
                 self.root.after(10, self.update_timer) 
                 # self.is_running permanece True para continuar o loop
 
-
-    def increase_opacity_event(self, event):
-        increase_opacity(self.root)
-
-    def decrease_opacity_event(self, event):
-        decrease_opacity(self.root)
+    def increase_opacity(self, event):
+        current_opacity = self.root.attributes('-alpha')
+        new_opacity = min(1.0, current_opacity + 0.05)
+        self.root.attributes('-alpha', new_opacity)
         
+    def decrease_opacity(self, event):
+        current_opacity = self.root.attributes('-alpha')
+        new_opacity = max(0.1, current_opacity - 0.05)
+        self.root.attributes('-alpha', new_opacity)
+
     def play_beep(self):
         for _ in range(2):
             winsound.Beep(1000, 300)
