@@ -1,160 +1,122 @@
 import tkinter as tk
+import customtkinter as ctk
 import winsound
-from utils import save_settings, load_settings, apply_settings
+from utils import save_json_config, load_json_config, increase_opacity, decrease_opacity
+
+CONFIG_KEY_PEIXE_FEAR = "peixe_fear_settings"
+CONFIG_FILE = "config.json"
 
 class PeixeFear:
     def __init__(self, root):
         self.root = root
         self.root.title("Peixe Fear")
-        self.root.overrideredirect(True)
-        self.root.geometry("200x100")
-        self.root.attributes('-alpha', 0.75)
         self.root.attributes('-topmost', True)
+        self.root.overrideredirect(True)
+        self.root.wm_attributes("-transparentcolor", "white")
+        self.root.configure(bg="white")  
 
-        self.initial_time = 120
-        self.time_left = self.initial_time
-        self.running = True
+        self.app_name = "peixe_fear"
+        self.total_time = 120  # 2 minutos
+        self.counter = self.total_time
+        self.is_active = True  
+        self.is_running = False 
 
-        self.timer_label = tk.Label(root, text="2:00", font=("Helvetica", 48))
-        self.timer_label.pack(expand=True)
+        self.font = ctk.CTkFont(size=48)
+        self.label_width = 200
+        self.label_height = 80
+        self.text_label = ctk.CTkLabel(self.root, text="2:00", font=self.font, text_color="lime",
+                                            bg_color="white", fg_color="white",  # Remove bordas cinzas
+                                            width=self.label_width, height=self.label_height)
+        self.text_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        self.update_timer()
-        self.create_menu()
+        self.load_settings()
 
-        self.moving = False
-        self.resizing = False
-        self.x, self.y = 0, 0
-        self.original_width = self.root.winfo_width()
-        self.original_height = self.root.winfo_height()
+        # Inicia o timer automaticamente na criação
+        self.root.after(100, self.start_timer_initial) 
 
-        self.root.bind("<Button-3>", self.show_menu)
+        self.root.bind("<plus>", self.start_or_restart_timer)
+        self.root.bind("<Control-Shift-Alt-Return>", self.exit_app)
+        self.root.bind("<Alt-plus>", self.increase_opacity)
+        self.root.bind("<Alt-minus>", self.decrease_opacity)
 
-        self.beep_type = "long"
-        apply_settings(self.root, "peixe_fear")
+        self.root.bind("<Button-1>", self.start_drag)
+        self.root.bind("<B1-Motion>", self.on_drag)
+        self.x_offset = 0
+        self.y_offset = 0
 
-    def update_timer(self):
-        if self.running:
-            minutes = self.time_left // 60
-            seconds = self.time_left % 60
-            time_string = f"{minutes}:{seconds:02d}"
-            self.timer_label.config(text=time_string)
+        self.root.protocol("WM_DELETE_WINDOW", self.save_config_and_exit)
 
-            if self.time_left <= 10:
-                color = self.get_color()
-                self.timer_label.config(fg=color)
+    def load_settings(self):
+        config = load_json_config(CONFIG_FILE, {})
+        peixe_fear_settings = config.get(CONFIG_KEY_PEIXE_FEAR, {"geometry": f"200x100+{self.root.winfo_screenwidth()//2 - 100}+{self.root.winfo_screenheight()//2 - 50}", "alpha": 0.75})
+        self.root.geometry(peixe_fear_settings.get("geometry"))
+        self.root.attributes('-alpha', peixe_fear_settings.get("alpha"))
 
-            if self.time_left > 0:
-                self.time_left -= 1
-                self.root.after(1000, self.update_timer)
-            else:
-                self.time_left = self.initial_time
-                self.timer_label.config(text="2:00", fg="black")
-                self.play_beep()
-                self.update_timer()
+    def save_settings(self):
+        config = load_json_config(CONFIG_FILE, {})
+        settings = {"geometry": self.root.geometry(), "alpha": self.root.attributes('-alpha')}
+        config[CONFIG_KEY_PEIXE_FEAR] = settings
+        save_json_config(CONFIG_FILE, config)
 
-    def get_color(self):
-        if self.time_left <= 5:
-            red = 255
-            green = int(255 * (self.time_left / 5))
-            blue = 0
-        else:
-            red = 255
-            green = 165
-            blue = 0
-        return f"#{red:02x}{green:02x}{blue:02x}"
-
-    def create_menu(self):
-        self.menu = tk.Menu(self.root, tearoff=0)
-
-        self.actions_menu = tk.Menu(self.menu, tearoff=0)
-        self.actions_menu.add_command(label="Iniciar", command=self.start_timer)
-        self.actions_menu.add_command(label="Pausar", command=self.pause_timer)
-        self.actions_menu.add_command(label="Reiniciar", command=self.restart_timer)
-        self.actions_menu.add_separator()
-        self.actions_menu.add_command(label="Bip Longo", command=lambda: self.set_beep_type("long"))
-        self.actions_menu.add_command(label="Bip Curto", command=lambda: self.set_beep_type("short"))
-        self.menu.add_cascade(label="Ações", menu=self.actions_menu)
-
-        self.opacity_menu = tk.Menu(self.menu, tearoff=0)
-        self.opacity_menu.add_command(label="1.0", command=lambda: self.update_opacity(1.0))
-        self.opacity_menu.add_command(label="0.75", command=lambda: self.update_opacity(0.75))
-        self.opacity_menu.add_command(label="0.5", command=lambda: self.update_opacity(0.5))
-        self.opacity_menu.add_command(label="0.25", command=lambda: self.update_opacity(0.25))
-        self.opacity_menu.add_command(label="0.10", command=lambda: self.update_opacity(0.10))
-        self.menu.add_cascade(label="Opacidade", menu=self.opacity_menu)
-
-        self.menu.add_command(label="Mover", command=self.start_move)
-        self.menu.add_command(label="Redimensionar", command=self.start_resize)
-        self.menu.add_command(label="Fechar", command=self.close)
-
-    def show_menu(self, event):
-        self.menu.post(event.x_root, event.y_root)
-
-    def start_timer(self):
-        if not self.running:
-            self.running = True
+    def start_timer_initial(self):
+        if self.is_active and not self.is_running:
+            self.is_running = True
             self.update_timer()
 
-    def pause_timer(self):
-        self.running = False
+    def start_drag(self, event):
+        self.x_offset = event.x
+        self.y_offset = event.y
 
-    def restart_timer(self):
-        self.running = False
-        self.time_left = self.initial_time
-        self.timer_label.config(text="2:00", fg="black")
-        self.running = True
-        self.update_timer()
+    def on_drag(self, event):
+        x = self.root.winfo_pointerx() - self.x_offset
+        y = self.root.winfo_pointery() - self.y_offset
+        self.root.geometry(f"+{x}+{y}")
 
-    def update_opacity(self, value):
-        self.root.attributes('-alpha', value)
+    def start_or_restart_timer(self, event=None):
+        self.is_active = True
+        self.counter = self.total_time
+        if not self.is_running:
+            self.is_running = True
+            self.update_timer()
 
-    def start_move(self):
-        self.moving = True
-        self.root.bind("<B1-Motion>", self.move)
-        self.root.bind("<ButtonRelease-1>", self.stop_move)
+    def update_timer(self):
+        if self.is_active and self.is_running:
+            if self.counter > 0:
+                minutes = self.counter // 60
+                seconds = self.counter % 60
+                self.text_label.configure(text=f"{minutes}:{seconds:02}")
+                self.counter -= 1
+                self.root.after(1000, self.update_timer)
+            else:
+                self.play_beep()
+                self.counter = self.total_time  # Reinicia o contador
+                self.text_label.configure(text="2:00") 
+                self.root.after(10, self.update_timer) 
+                # self.is_running permanece True para continuar o loop
 
-    def move(self, event):
-        if self.moving:
-            self.root.geometry(f"+{event.x_root}+{event.y_root}")
 
-    def stop_move(self, event):
-        self.moving = False
-        self.root.unbind("<B1-Motion>")
-        self.root.unbind("<ButtonRelease-1>")
+    def increase_opacity_event(self, event):
+        increase_opacity(self.root)
 
-    def start_resize(self):
-        self.resizing = True
-        self.root.bind("<B1-Motion>", self.resize_proportional)
-        self.root.bind("<ButtonRelease-1>", self.stop_resize)
+    def decrease_opacity_event(self, event):
+        decrease_opacity(self.root)
+        
+    def play_beep(self):
+        for _ in range(2):
+            winsound.Beep(1000, 300)
 
-    def resize_proportional(self, event):
-        if self.resizing:
-            width_ratio = event.x / self.original_width
-            height_ratio = event.y / self.original_height
-            ratio = max(width_ratio, height_ratio)
-            new_width = int(self.original_width * ratio)
-            new_height = int(self.original_height * ratio)
-            self.root.geometry(f"{new_width}x{new_height}")
-
-    def stop_resize(self, event):
-        self.resizing = False
-        self.root.unbind("<B1-Motion>")
-        self.root.unbind("<ButtonRelease-1>")
-
-    def close(self):
-        save_settings(self.root, "peixe_fear")
+    def exit_app(self, event=None):
+        self.is_active = False
+        self.is_running = False
         self.root.destroy()
 
-    def set_beep_type(self, beep_type):
-        self.beep_type = beep_type
-
-    def play_beep(self):
-        frequency = 2500
-        duration = 200 if self.beep_type == "long" else 150
-        winsound.Beep(frequency, duration)
-        winsound.Beep(frequency, duration)
+    def save_config_and_exit(self):
+        self.save_settings()
+        self.exit_app()
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = PeixeFear(root)
+    root.withdraw()
+    toplevel = ctk.CTkToplevel(root)
+    app = PeixeFear(toplevel)
     root.mainloop()

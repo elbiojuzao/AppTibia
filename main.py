@@ -7,6 +7,7 @@ import io
 import os
 from info_world import InfoWorldWindow
 from split_loot import SplitLootWindow
+from peixe_fear import PeixeFear
 from main_help_window import MainHelpWindow
 from utils import load_json_config, save_json_config, requisicao_api
 import datetime
@@ -289,6 +290,9 @@ class MainApplication(ctk.CTk):
             script_dir = os.path.dirname(os.path.abspath(__file__))
             putre_totem_path = os.path.join(script_dir, "putre_totem.py")
             subprocess.Popen(["python", putre_totem_path])
+        elif command == "peixe_fear.py":
+            peixe_fear_window = ctk.CTkToplevel(self)
+            app = PeixeFear(peixe_fear_window)
         else:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             app_path = os.path.join(script_dir, command)
