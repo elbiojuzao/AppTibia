@@ -1,123 +1,125 @@
 import tkinter as tk
-import time
+import customtkinter as ctk
 import winsound
-from utils import save_settings, load_settings, apply_settings
+from utils import save_json_config, load_json_config
 
-class RBBoss:
+CONFIG_KEY_rb_boss = "rb_boss_settings"
+CONFIG_FILE = "config.json"
+
+class RbBossWindow(ctk.CTkToplevel):
     def __init__(self, root):
         self.root = root
-        self.root.title("RB Boss")
-        self.root.overrideredirect(True)
+        self.root.title("Rb Boss")
         self.root.attributes('-topmost', True)
+        self.root.overrideredirect(True)
+        self.root.wm_attributes("-transparentcolor", "white")
+        self.root.configure(bg="white")  
 
-        self.initial_time = 90
-        self.time_left = self.initial_time
-        self.running = False
-        self.beep_ligado = False
+        self.app_name = "rb_boss"
+        self.total_time = 90  # 1 minutos 30 segundos
+        self.counter = self.total_time
+        self.is_active = True  
+        self.is_running = False 
 
-        self.punish_label = tk.Label(root, text="", font=("Helvetica", 24), fg="red")
-        self.punish_label.pack()
+        self.font = ctk.CTkFont(size=48)
+        self.label_width = 200
+        self.label_height = 80
+        self.text_label = ctk.CTkLabel(self.root, text="1:30", font=self.font, text_color="lime",
+                                            bg_color="white", fg_color="white",  # Remove bordas cinzas
+                                            width=self.label_width, height=self.label_height)
+        self.text_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        self.timer_label = tk.Label(root, text="1:30", font=("Helvetica", 24))
-        self.timer_label.pack()
+        self.load_settings()
 
-        self.root.geometry("200x100")
+        # Inicia o timer automaticamente na criação
+        self.root.after(100, self.start_timer_initial) 
 
-        self.menu = tk.Menu(root, tearoff=0)
-        self.menu.add_command(label="Iniciar", command=self.start_timer)
-        self.menu.add_command(label="Pausar", command=self.pause_timer)
-        self.menu.add_command(label="Mover", command=self.start_move)
-        self.menu.add_command(label="Beep", command=self.alternar_beep)
-        self.menu.add_command(label="Fechar", command=self.close)
+        self.root.bind("<plus>", self.start_or_restart_timer)
+        self.root.bind("<Control-Shift-Alt-Return>", self.exit_app)
+        self.root.bind("<Alt-plus>", self.increase_opacity)
+        self.root.bind("<Alt-minus>", self.decrease_opacity)
 
-        self.root.bind("<Button-3>", self.show_menu)
+        self.root.bind("<Button-1>", self.start_drag)
+        self.root.bind("<B1-Motion>", self.on_drag)
+        self.x_offset = 0
+        self.y_offset = 0
 
-        self.first_run = True 
-        apply_settings(self.root, "rb_boss") 
+        self.root.protocol("WM_DELETE_WINDOW", self.save_config_and_exit)
 
-        self.moving = False
+    def load_settings(self):
+        config = load_json_config(CONFIG_FILE, {})
+        rb_boss_settings = config.get(CONFIG_KEY_rb_boss, {"geometry": f"200x100+{self.root.winfo_screenwidth()//2 - 100}+{self.root.winfo_screenheight()//2 - 50}", "alpha": 0.75})
+        self.root.geometry(rb_boss_settings.get("geometry"))
+        self.root.attributes('-alpha', rb_boss_settings.get("alpha"))
 
-    def show_menu(self, event):
-        self.menu.post(event.x_root, event.y_root)
+    def save_settings(self):
+        config = load_json_config(CONFIG_FILE, {})
+        settings = {"geometry": self.root.geometry(), "alpha": self.root.attributes('-alpha')}
+        config[CONFIG_KEY_rb_boss] = settings
+        save_json_config(CONFIG_FILE, config)
 
-    def start_timer(self):
-        if not self.running:
-            self.running = True
+    def start_timer_initial(self):
+        if self.is_active and not self.is_running:
+            self.is_running = True
             self.update_timer()
 
-    def pause_timer(self):
-        self.running = False
+    def start_drag(self, event):
+        self.x_offset = event.x
+        self.y_offset = event.y
 
-    def alternar_beep(self):
-        self.beep_ligado = not self.beep_ligado
-        if self.beep_ligado:
-            self.menu.entryconfig("Beep", label="Sem Beep")
-        else:
-            self.menu.entryconfig("Beep", label="Beep")
+    def on_drag(self, event):
+        x = self.root.winfo_pointerx() - self.x_offset
+        y = self.root.winfo_pointery() - self.y_offset
+        self.root.geometry(f"+{x}+{y}")
 
-    def beep(self):
-        winsound.Beep(2500, 150)
-        winsound.Beep(2500, 150)
+    def start_or_restart_timer(self, event=None):
+        self.is_active = True
+        self.counter = self.total_time
+        if not self.is_running:
+            self.is_running = True
+            self.update_timer()
 
     def update_timer(self):
-        if self.running:
-            minutes = self.time_left // 60
-            seconds = self.time_left % 60
-            time_string = f"{minutes}:{seconds:02d}"
-            self.timer_label.config(text=time_string)
-
-            if not self.first_run:
-                if self.time_left == 84:
-                    self.punish_label.config(text="PUNISH")
-                elif self.time_left == 78:
-                    self.punish_label.config(text="RAAAR")
-                    self.blink_raaar(2)
-                elif self.time_left == 76:
-                    self.punish_label.config(text="Blood Jaw", fg="red")
-
-            if self.time_left == 10:
-                self.punish_label.config(text="Atenção", fg="yellow")
-            elif self.time_left == 5:
-                self.punish_label.config(text="Sobe", fg="red")
-
-            if self.time_left > 0:
-                self.time_left -= 1
+        if self.is_active and self.is_running:
+            if self.counter > 0:
+                minutes = self.counter // 60
+                seconds = self.counter % 60
+                self.text_label.configure(text=f"{minutes}:{seconds:02}")
+                self.counter -= 1
                 self.root.after(1000, self.update_timer)
             else:
-                self.time_left = self.initial_time
-                self.punish_label.config(text="") 
-                self.first_run = False 
-                self.update_timer()
-                if self.beep_ligado:
-                    self.beep()
-                    self.beep()
+                self.play_beep()
+                self.counter = self.total_time  # Reinicia o contador
+                self.text_label.configure(text="1:30") 
+                self.root.after(10, self.update_timer) 
+                # self.is_running permanece True para continuar o loop
 
-    def blink_raaar(self, count):
-        if count > 0:
-            current_color = self.punish_label.cget("fg")
-            new_color = "yellow" if current_color == "red" else "red"
-            self.punish_label.config(fg=new_color)
-            self.root.after(500, lambda: self.blink_raaar(count - 1))
+    def increase_opacity(self, event):
+        current_opacity = self.root.attributes('-alpha')
+        new_opacity = min(1.0, current_opacity + 0.05)
+        self.root.attributes('-alpha', new_opacity)
+        
+    def decrease_opacity(self, event):
+        current_opacity = self.root.attributes('-alpha')
+        new_opacity = max(0.1, current_opacity - 0.05)
+        self.root.attributes('-alpha', new_opacity)
 
-    def start_move(self):
-        self.moving = True
-        self.root.bind("<B1-Motion>", self.move)
-        self.root.bind("<ButtonRelease-1>", self.stop_move)
+    def play_beep(self):
+        for _ in range(2):
+            winsound.Beep(1000, 300)
 
-    def move(self, event):
-        if self.moving:
-            self.root.geometry(f"+{event.x_root}+{event.y_root}")
-
-    def stop_move(self, event):
-        self.moving = False
-        self.root.unbind("<B1-Motion>")
-        self.root.unbind("<ButtonRelease-1>")
-
-    def close(self):
-        save_settings(self, "rb_boss") 
+    def exit_app(self, event=None):
+        self.is_active = False
+        self.is_running = False
         self.root.destroy()
+
+    def save_config_and_exit(self):
+        self.save_settings()
+        self.exit_app()
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = RBBoss(root)
+    root.withdraw()
+    toplevel = ctk.CTkToplevel(root)
+    app = RbBossWindow(toplevel)
     root.mainloop()
