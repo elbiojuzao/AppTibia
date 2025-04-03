@@ -5,10 +5,10 @@
         "geometry": "200x100+749+208"
     },
     "putre_totem": {
-        "x": 377,
+        "x": 1093,
         "y": 552,
         "largura": 200,
-        "altura": 150
+        "altura": 100
     },
     "ssa_might": {
         "x": 1163,

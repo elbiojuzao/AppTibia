@@ -25,7 +25,7 @@ class PeixeFear:
         self.label_width = 200
         self.label_height = 80
         self.text_label = ctk.CTkLabel(self.root, text="2:00", font=self.font, text_color="lime",
-                                            bg_color="white", fg_color="white",  # Remove bordas cinzas
+                                            bg_color="white", fg_color="white", 
                                             width=self.label_width, height=self.label_height)
         self.text_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
@@ -48,7 +48,9 @@ class PeixeFear:
 
     def load_settings(self):
         config = load_json_config(CONFIG_FILE, {})
-        peixe_fear_settings = config.get(CONFIG_KEY_PEIXE_FEAR, {"geometry": f"200x100+{self.root.winfo_screenwidth()//2 - 100}+{self.root.winfo_screenheight()//2 - 50}", "alpha": 0.75})
+        peixe_fear_settings = config.get(CONFIG_KEY_PEIXE_FEAR, 
+            {"geometry": f"200x100+{self.root.winfo_screenwidth()//2 - 100}+{self.root.winfo_screenheight()//2 - 50}",
+            "alpha": 0.75})
         self.root.geometry(peixe_fear_settings.get("geometry"))
         self.root.attributes('-alpha', peixe_fear_settings.get("alpha"))
 

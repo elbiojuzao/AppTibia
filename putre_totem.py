@@ -28,7 +28,7 @@ class PutreTotemApp:
         self.label_width = 200
         self.label_height = 80
         self.text_label = ctk.CTkLabel(self.root, text="2:00", font=self.font, text_color="lime",
-                                            bg_color="white", fg_color="white",  # Remove bordas cinzas
+                                            bg_color="white", fg_color="white", 
                                             width=self.label_width, height=self.label_height)
         self.text_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
@@ -50,7 +50,7 @@ class PutreTotemApp:
     def load_config(self):
         config = load_json_config(CONFIG_FILE, {})
         putre_totem_settings = config.get(CONFIG_KEY_PUTRE_TOTEM, {
-            "geometry": f"100x50+{self.root.winfo_screenwidth()//2 - 50}+{self.root.winfo_screenheight()//2 - 25}",
+            "geometry": f"200x100+{self.root.winfo_screenwidth()//2 - 100}+{self.root.winfo_screenheight()//2 - 50}",
             "alpha": 0.8
         })
         self.root.geometry(putre_totem_settings.get("geometry"))
