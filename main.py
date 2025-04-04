@@ -13,6 +13,22 @@ from main_help_window import MainHelpWindow
 from utils import load_json_config, save_json_config, requisicao_api
 import datetime
 import pytz 
+from atualizador_utils import verificar_atualizacao, baixar_arquivo, iniciar_atualizador
+
+atualizacao = verificar_atualizacao()
+if atualizacao:
+    print("🆕 Nova versão disponível:", atualizacao["version"])
+    print("Changelog:", atualizacao["changelog"])
+    resposta = input("Deseja atualizar agora? (s/n): ")
+    if resposta.lower() == "s":
+        print("⏬ Baixando nova versão...")
+        sucesso = baixar_arquivo(atualizacao["url"], "AppTibia_novo.exe")
+        if sucesso:
+            print("✅ Download concluído. Atualizando...")
+            iniciar_atualizador()
+        else:
+            print("❌ Erro ao baixar atualização.")
+
 
 class MainApplication(ctk.CTk):
     def __init__(self):
